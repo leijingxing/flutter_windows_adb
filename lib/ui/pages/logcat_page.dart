@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../common/device_registry.dart';
 import '../../models/log_entry.dart';
@@ -43,6 +44,9 @@ class _LogcatPageState extends State<LogcatPage> {
 
   /// [_keyword] 当前关键词过滤，来源于输入框。
   String get _keyword => _filterController.text.trim();
+
+  /// [_autoScrollEnabled] 是否自动跟随滚动到底部。
+  bool _autoScrollEnabled = true;
 
   /// [_loading] 标记是否正在读取。
   bool _loading = false;
@@ -98,10 +102,12 @@ class _LogcatPageState extends State<LogcatPage> {
   /// [_clearScreen] 清空当前显示。
   void _clearScreen() {
     setState(() => _logs.clear());
+    _scrollToBottom(force: true);
   }
 
   /// [_scrollToBottom] 自动滚动到最新。
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false}) {
+    if (!_autoScrollEnabled && !force) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       _scrollController.animateTo(
@@ -168,6 +174,16 @@ class _LogcatPageState extends State<LogcatPage> {
                 child: const Text('清屏'),
               ),
               const SizedBox(width: 8),
+              if (!_autoScrollEnabled)
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _autoScrollEnabled = true);
+                    _scrollToBottom(force: true);
+                  },
+                  icon: const Icon(Icons.playlist_add_check),
+                  label: const Text('恢复跟随'),
+                ),
+              if (!_autoScrollEnabled) const SizedBox(width: 8),
               IconButton(
                 tooltip: '调整字号',
                 onPressed: _showFontSizeDialog,
@@ -224,24 +240,38 @@ class _LogcatPageState extends State<LogcatPage> {
                   : Builder(builder: (context) {
                       final filtered =
                           _logs.where((e) => _passFilters(e)).toList();
-                      return ListView.builder(
-                        controller: _scrollController,
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final entry = filtered[index];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 2, horizontal: 8),
-                            child: SelectableText(
-                              _formatEntry(entry),
-                              style: TextStyle(
-                                color: _colorForLevel(entry.level),
-                                fontFamily: 'Consolas',
-                                fontSize: _fontSize,
-                              ),
-                            ),
-                          );
+                      return NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification is UserScrollNotification) {
+                            // 用户向上滚动时暂停自动跟随。
+                            if (notification.direction ==
+                                ScrollDirection.reverse) {
+                              if (_autoScrollEnabled) {
+                                setState(() => _autoScrollEnabled = false);
+                              }
+                            }
+                          }
+                          return false;
                         },
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            final entry = filtered[index];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 2, horizontal: 8),
+                              child: SelectableText(
+                                _formatEntry(entry),
+                                style: TextStyle(
+                                  color: _colorForLevel(entry.level),
+                                  fontFamily: 'Consolas',
+                                  fontSize: _fontSize,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       );
                     }),
             ),
