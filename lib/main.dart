@@ -19,6 +19,7 @@ class AdbDesktopApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+        fontFamily: 'NotoSansCJKsc',
       ),
       home: const HomeShell(),
     );
